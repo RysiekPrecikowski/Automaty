@@ -70,6 +70,13 @@ class TransitionFunction:
         return xd
 
     def convert_to_deterministic(self, table=None, alphabet=None, starting_states=None, accepting_states=None):
+        def print_helper(s):
+            res = '{'
+            for i, state in enumerate(s):
+                res += str(state) + (' ' if i < len(s) - 1 else '')
+
+            return res + '}'
+
         if table is None:
             table = self.table
         if alphabet is None:
@@ -79,15 +86,32 @@ class TransitionFunction:
         if accepting_states is None:
             accepting_states = self.accepting_states
 
-        pprint(table)
+        # pprint(table)
 
         res_table = {}
         res_accepting_states = set()
 
         states = {frozenset([starting_states])}
 
-        starting_states_res = frozenset([starting_states])
+        # print(self.get_epsilon_closure(starting_states))
 
+        x = set()
+        for state in self.get_epsilon_closure(starting_states):
+            x.add(state)
+
+        states = {frozenset(x)}
+
+        for xd in states:
+            starting_state = set()
+            for state in xd:
+                # print(state)
+                starting_state.add(state)
+
+            # print(starting_state)
+
+        starting_states_res = frozenset(starting_state)
+
+        print("STARTING", print_helper(starting_states_res))
         while states:
             current_states = states.pop()
             res_table[current_states] = {}
@@ -113,9 +137,23 @@ class TransitionFunction:
 
                 res_table[current_states][l] = frozenset(new_state)
 
-        pprint(res_table)
-        pprint(res_accepting_states)
-        pprint(starting_states_res)
+        # pprint(res_table)
+        print("\nCONVERTED TO DETERMINISTIC")
+
+
+        for state, idk in res_table.items():
+            spaces = ' ' * (len(str(print_helper(state))) + len(" ---> {"))
+            print(print_helper(state), end=" ---> {\n")
+            for symbol, to in idk.items():
+                print(spaces + str(symbol)+' --> '+str(print_helper(to)), end=',\n')
+
+            print(spaces+"}")
+
+
+        print('\nACCEPTING STATES')
+        for state in res_accepting_states:
+            print(print_helper(state))
+
 
         res = TransitionFunction(res_table, res_accepting_states, starting_states_res)
         res.deterministic = True
@@ -139,7 +177,7 @@ class FiniteAutomata:
         def set_root(self, nodes):
             self.roots = list(nodes)
 
-        def show(self, show_edge_labels=False, figsize=(9, 9)):
+        def show(self, show_edge_labels=False, figsize=(5, 5)):
             q = self.roots
             i = 0
 
@@ -331,7 +369,7 @@ def main():
     func_converted = func.convert_to_deterministic()
 
     automata = FiniteAutomata(func)
-    automata = FiniteAutomata(func_converted)
+    # automata = FiniteAutomata(func_converted)
     #
     # automata.run('110100')
     #
@@ -374,4 +412,30 @@ def test_enas_to_nas():
 if __name__ == '__main__':
     # main()
     # test_enas()
-    test_enas_to_nas()
+    # test_enas_to_nas()
+
+    func5c = TransitionFunction(
+        {
+            'q0': {'0': {},
+                   TransitionFunction.Epsilon: {'q1', 'q3'}},
+
+            'q1': {'0': {'q2'},
+                   TransitionFunction.Epsilon: {}},
+
+            'q2': {'0': {'q1'},
+                   TransitionFunction.Epsilon: {}},
+
+            'q3': {'0': {'q4'},
+                   TransitionFunction.Epsilon: {}},
+
+            'q4': {'0': {'q5'},
+                   TransitionFunction.Epsilon: {}},
+
+            'q5': {'0': {'q3'},
+                   TransitionFunction.Epsilon: {}},
+
+        },
+        {'q1', 'q3'},
+        'q0'
+    )
+    func_converted5c = func5c.convert_to_deterministic()
