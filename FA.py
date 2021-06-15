@@ -69,13 +69,16 @@ class TransitionFunction:
         xd.add(state)
         return xd
 
-    def convert_to_deterministic(self, table=None, alphabet=None, starting_states=None, accepting_states=None):
-        def print_helper(s):
-            res = '{'
-            for i, state in enumerate(s):
-                res += str(state) + (' ' if i < len(s) - 1 else '')
+    @staticmethod
+    def print_helper(s):
+        res = '{'
+        for i, state in enumerate(s):
+            res += str(state) + (' ' if i < len(s) - 1 else '')
 
-            return res + '}'
+        return res + '}'
+
+    def convert_to_deterministic(self, table=None, alphabet=None, starting_states=None, accepting_states=None):
+
 
         if table is None:
             table = self.table
@@ -111,7 +114,7 @@ class TransitionFunction:
 
         starting_states_res = frozenset(starting_state)
 
-        print("STARTING", print_helper(starting_states_res))
+        print("STARTING", self.print_helper(starting_states_res))
         while states:
             current_states = states.pop()
             res_table[current_states] = {}
@@ -122,6 +125,8 @@ class TransitionFunction:
             for l in alphabet - {self.Epsilon, self.Epsilon_closure}:
                 new_state = set()
                 for state in current_states:
+                    if l not in table[state]:
+                        continue
                     transition_to = table[state][l]
 
                     for to_state in transition_to:
@@ -142,17 +147,17 @@ class TransitionFunction:
 
 
         for state, idk in res_table.items():
-            spaces = ' ' * (len(str(print_helper(state))) + len(" ---> {"))
-            print(print_helper(state), end=" ---> {\n")
+            spaces = ' ' * (len(str(self.print_helper(state))) + len(" ---> {"))
+            print(self.print_helper(state), end=" ---> {\n")
             for symbol, to in idk.items():
-                print(spaces + str(symbol)+' --> '+str(print_helper(to)), end=',\n')
+                print(spaces + str(symbol)+' --> '+str(self.print_helper(to)), end=',\n')
 
             print(spaces+"}")
 
 
         print('\nACCEPTING STATES')
         for state in res_accepting_states:
-            print(print_helper(state))
+            print(self.print_helper(state))
 
 
         res = TransitionFunction(res_table, res_accepting_states, starting_states_res)
@@ -162,6 +167,110 @@ class TransitionFunction:
     def __getitem__(self, item):
         return self.table[item]
 
+
+    def minimize(self):
+        class cell:
+            def __init__(self):
+                self.dist = False
+
+            def __repr__(self):
+                return str(self.dist)
+
+        def get(s0, s1) -> cell:
+            if s0 in arr and s1 in arr[s0]:
+                return arr[s0][s1]
+            if s1 in arr and s0 in arr[s1]:
+                return arr[s1][s0]
+
+            return cell()
+
+        arr = {s : {} for s in list(self.table)[:len(self.table) -1]}
+
+        for i in range(1, len(self.table)):
+            for k in list(arr.keys())[:i]:
+                for s in list(self.table)[i:]:
+                    arr[k][s] = cell()
+
+                    if (s in self.accepting_states) ^ (k in self.accepting_states): # ^ to xor
+                        # if s in self.accepting_states and
+                        arr[k][s].dist = True
+
+        pprint(arr)
+
+
+        change = True
+        while change:
+            change = False
+            for s0 in arr.keys():
+                for s1 in arr[s0].keys():
+                    for l in self.alphabet:
+                        try:
+                            a0 = list(self[s0][l]).pop()
+                            a1 = list(self[s1][l]).pop()
+                        except BaseException:
+                            continue
+
+                        tile = get(a0, a1)
+                        # print(a0, a1, tile)
+                        if tile.dist and get(s0, s1).dist is False:
+                            get(s0, s1).dist = True
+                            change = True
+
+        pprint(arr)
+        states = set(self.table.keys())
+        used_states = set()
+        new_states = set()
+
+        for s0 in arr.keys():
+            for s1 in arr[s0].keys():
+                if not arr[s0][s1].dist:
+                    # print(s0, s1)
+                    used_states.add(s0)
+                    used_states.add(s1)
+                    new_states.add(frozenset([s0, s1]))
+
+        for state in states - used_states:
+            new_states.add(frozenset([state]))
+
+        new_starting_state = None
+        new_accepting_states = set()
+        new_table = {s : {} for s in new_states}
+        for state in new_states:
+            if self.starting_state in state:
+                new_starting_state = state
+
+            if len(self.accepting_states & state):
+                new_accepting_states.add(state)
+
+            original = list(state)[0]
+
+            for l in self.alphabet:
+                for s in new_states:
+                    if not self.table[original][l]:
+                        continue
+                    if len(self.table[original][l] & s) > 0:
+                        new_table[state][l] = s
+
+
+        print()
+        print("STARTING :", self.print_helper(new_starting_state))
+        print("ACCEPTING:", end=" ")
+        for state in new_accepting_states:
+            print(self.print_helper(state), end=", ")
+        print()
+
+        for state, idk in new_table.items():
+            spaces = ' ' * (len(str(self.print_helper(state))) + len(" ---> {"))
+            print(self.print_helper(state), end=" ---> {\n")
+            for symbol, to in idk.items():
+                print(spaces + str(symbol) + ' --> ' + str(self.print_helper(to)), end=',\n')
+
+            print(spaces + "}")
+        # pprint(new_table)
+
+        self.accepting_states = new_accepting_states
+        self.starting_state = new_starting_state
+        self.table = new_table
 
 class FiniteAutomata:
     class Visualizer:
@@ -287,8 +396,8 @@ class FiniteAutomata:
             print("STATES", states,"L", l)
             new_states = []
             for state in states:
-                # if l not in self.transition_function[state.state]: #TODO chyba można wywalić
-                #     continue
+                if l not in self.transition_function[state.state]:
+                    continue
 
                 if self.transition_function.deterministic:
                     to = self.transition_function[state.state][l]
@@ -331,8 +440,8 @@ class FiniteAutomata:
             print(states, l)
             new_states = set()
             for state in states:
-                # if l not in self.transition_function[state.state]: #TODO chyba można wywalić
-                #     continue
+                if l not in self.transition_function[state.state]:
+                    continue
 
                 for to in self.transition_function[state.state][l]:
                     new_state = state.add_child(to, l)
@@ -376,6 +485,33 @@ def main():
     automata.run('111000')
     automata.visualizer.show(show_edge_labels=False)
 
+def test_minimize():
+    xd = {
+        'A': {'0': {'B'}, '1': {'F'}},
+        'B': {'0': {'G'}, '1': {'C'}},
+        'C': {'0': {}, '1': {'C'}},
+        'D': {'0': {'C'}, '1': {'G'}},
+        'E': {'0': {'H'}, '1': {'F'}},
+        'F': {'0': {'C'}, '1': {'G'}},
+        'G': {'0': {'G'}, '1': {'E'}},
+        'H': {'0': {'G'}, '1': {'C'}},
+    }
+    func = TransitionFunction(xd, {'C'}, 'A')
+    func.minimize()
+
+    xd = {
+        'A': {'0': {'B'}, '1': {'A'}},
+        'B': {'0': {'A'}, '1': {'C'}},
+        'C': {'0': {'D'}, '1': {'B'}},
+        'D': {'0': {'D'}, '1': {'A'}},
+        'E': {'0': {'D'}, '1': {'F'}},
+        'F': {'0': {'G'}, '1': {'E'}},
+        'G': {'0': {'F'}, '1': {'G'}},
+        'H': {'0': {'G'}, '1': {'D'}},
+    }
+    func = TransitionFunction(xd, {'D'}, 'A')
+    func.minimize()
+
 def test_enas():
     xd = {
         1: {'0': {1}, '1': {1, 2}, TransitionFunction.Epsilon: {}},
@@ -413,29 +549,30 @@ if __name__ == '__main__':
     # main()
     # test_enas()
     # test_enas_to_nas()
+    test_minimize()
 
-    func5c = TransitionFunction(
-        {
-            'q0': {'0': {},
-                   TransitionFunction.Epsilon: {'q1', 'q3'}},
-
-            'q1': {'0': {'q2'},
-                   TransitionFunction.Epsilon: {}},
-
-            'q2': {'0': {'q1'},
-                   TransitionFunction.Epsilon: {}},
-
-            'q3': {'0': {'q4'},
-                   TransitionFunction.Epsilon: {}},
-
-            'q4': {'0': {'q5'},
-                   TransitionFunction.Epsilon: {}},
-
-            'q5': {'0': {'q3'},
-                   TransitionFunction.Epsilon: {}},
-
-        },
-        {'q1', 'q3'},
-        'q0'
-    )
-    func_converted5c = func5c.convert_to_deterministic()
+    # func5c = TransitionFunction(
+    #     {
+    #         'q0': {'0': {},
+    #                TransitionFunction.Epsilon: {'q1', 'q3'}},
+    #
+    #         'q1': {'0': {'q2'},
+    #                TransitionFunction.Epsilon: {}},
+    #
+    #         'q2': {'0': {'q1'},
+    #                TransitionFunction.Epsilon: {}},
+    #
+    #         'q3': {'0': {'q4'},
+    #                TransitionFunction.Epsilon: {}},
+    #
+    #         'q4': {'0': {'q5'},
+    #                TransitionFunction.Epsilon: {}},
+    #
+    #         'q5': {'0': {'q3'},
+    #                TransitionFunction.Epsilon: {}},
+    #
+    #     },
+    #     {'q1', 'q3'},
+    #     'q0'
+    # )
+    # func_converted5c = func5c.convert_to_deterministic()
