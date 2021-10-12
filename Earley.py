@@ -1,3 +1,5 @@
+#All credits goes to ???? (its not my code, i don't know where I've got this
+
 from queue import PriorityQueue
 
 
