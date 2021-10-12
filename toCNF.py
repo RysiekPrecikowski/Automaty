@@ -1,3 +1,16 @@
+# all credits goes to https://github.com/nikos912000/chomsky-normal-form/blob/master/normal%20chomsky.py
+
+#-------------------------------------------------------------------------------
+# Name:        Context-Free Grammar to Normal-Chomsky Form (CFG to NCF)
+# Purpose:     This script transforms a context-free grammar to Normal-Chomsky
+#              form, according to the book 'Elements of Theory of Computation'
+#              written by Lewis and Papadimitriou.
+#
+# Author:      Nikos Katirtzis (nikos912000)
+#
+# Created:     29/04/2014
+#-------------------------------------------------------------------------------
+
 from string import letters
 import copy
 import re
